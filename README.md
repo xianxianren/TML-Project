@@ -1,4 +1,4 @@
-# Loan Status Preprocessing & Balancing (TML-Project)
+# Loan Status Preprocessing & Balancing (TML-Project) 
 
 This repository contains the preprocessing pipeline for predicting loan defaults. The pipeline reads raw loan application data, cleans clutter, handles missing values, encodes categorical features, and balances the dataset using SMOTE (Synthetic Minority Over-sampling Technique) to prepare it for Machine Learning model ingestion.
 
