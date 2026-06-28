@@ -17,20 +17,21 @@ TML-Project/
 
 | Cell | Phase | Description |
 |------|-------|-------------|
-| 1 | Setup | Import all required libraries |
+| 1 | Setup | Clean and categorized import of libraries (pandas, scikit-learn, xgboost, shap, etc.) |
 | 2 | Step 1 | Load dataset (`loan.csv`) |
-| 3 | Step 1 | Standardize column names |
-| 4 | Step 1 | Define & filter target variable (`loan_status`) |
-| 5 | Step 2 | Remove data leakage columns |
-| 6 | Step 3 | Clean, impute & drop high-missing columns |
-| 7 | Step 4 | Encode categorical features |
-| 8 | Step 5 | Train-test split, scaling (StandardScaler) & SMOTE |
-| 9 | Model 1 | Train & evaluate Logistic Regression |
-| 10 | Model 2 | Train & evaluate Random Forest |
-| 11 | Model 3a | Train & evaluate base XGBoost (default threshold) |
-| 12 | SHAP 3a | SHAP Global Summary + Local Waterfall for base XGBoost |
-| 13 | Model 3b | Train & evaluate TUNED XGBoost (custom threshold + `scale_pos_weight`) |
-| 14 | SHAP 3b | SHAP Global Summary + Local Waterfall for TUNED XGBoost |
+| 3 | Step 1 | Standardize column names to snake_case |
+| 4 | Step 1 | Define & filter target variable (`loan_status` mapped to 0/1) |
+| 5 | Step 2 | Remove 13 known data leakage columns (e.g. recoveries, total payments) |
+| 6 | Step 3 | Clean useless IDs, drop high-missing columns (>50%), and impute null values |
+| 7 | Step 4 | Encode categorical features (Term/Emp Length numeric extract, Grade mapping, One-Hot encoding) |
+| 8 | Step 5 | Stratified Train-test split (80/20), StandardScaler scaling, and training-only SMOTE |
+| 9 | Model 1 | Logistic Regression baseline with 5-Fold Stratified CV, 30-Seed robustness check, & coefficients analysis |
+| 10 | Model 2 | Random Forest baseline with 5-Fold Stratified CV, 30-Seed robustness check, & Gini importance |
+| 11 | Model 3a | Base XGBoost classifier with 5-Fold Stratified CV, 30-Seed robustness check, & built-in feature importance |
+| 12 | SHAP 3a | SHAP explainers (Global Summary Plot, Local Waterfall, and Individual Applicant #0 probability conversion) |
+| 13 | Summary | All 3 Models Robustness Summary (prints a comparison table of 30-seed average metrics) |
+| 14 | Model 3b | Tuned XGBoost with class weight penalty (`scale_pos_weight`), 5-Fold CV, 30-Seed check, & 30% decision threshold |
+| 15 | SHAP 3b | SHAP Global Summary, Local Waterfall, and Tuned Individual Applicant #0 evaluation |
 
 ---
 
@@ -202,13 +203,19 @@ Three models are trained on the SMOTE-balanced data and evaluated on the origina
 - **Problem:** Acts as a black box — built-in `feature_importances_` only shows which features were used for splits, but not the direction or magnitude of their effect
 - **Solution:** SHAP in the next phase
 
-**Key metrics compared:**
+**Validation Protocol:**
+To ensure generalizability, stability, and zero data leakage, **every single model stage** (Logistic Regression, Random Forest, Base XGBoost, and Tuned XGBoost) is evaluated using these two rigorous methods:
 
-| Model | Accuracy | Precision | Recall | F1 | ROC-AUC |
-|-------|----------|-----------|--------|----|---------|
-| Logistic Regression | ~0.65 | ~0.29 | ~0.65 | ~0.40 | ~0.70 |
-| Random Forest | ~0.79 | ~0.39 | ~0.21 | ~0.28 | ~0.69 |
-| XGBoost (base) | ~0.82 | ~0.48 | ~0.08 | ~0.14 | ~0.70 |
+1. **5-Fold Stratified Cross-Validation (`scaler -> SMOTE -> model`, all inside each fold)**: Splits the data into 5 stratified folds. Scaling and SMOTE-oversampling are applied *strictly inside each fold* to ensure no information leaks from validation folds into training.
+2. **30-Seed Robustness Check (`full split -> scale -> SMOTE -> train -> test`, repeated)**: The entire train-test split, scaling, balancing, training, and testing cycle is repeated 30 times across 30 different random seeds to verify that model performance is stable and not a fluke of a single split.
+
+Below are the **Robustness Summary** results (averaged over 30 seeds, showing `Mean ± SD`):
+
+| Model | Accuracy | Precision | Recall | F1-Score | ROC-AUC |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| **Logistic Regression** | 64.68% ± 0.19% | 29.26% ± 0.18% | **64.97% ± 0.47%** | 40.35% ± 0.24% | 70.21% ± 0.25% |
+| **Random Forest** | 79.35% ± 0.14% | 38.75% ± 0.57% | 21.23% ± 0.34% | 27.43% ± 0.36% | 69.06% ± 0.21% |
+| **XGBoost (base)** | **81.50% ± 0.08%** | **48.02% ± 1.33%** | 8.02% ± 0.34% | 13.74% ± 0.53% | **70.25% ± 0.23%** |
 
 ---
 
@@ -256,13 +263,13 @@ y_pred = (y_pred_proba >= 0.30).astype(int)
 ```
 Instead of flagging loans as "Bad" only when predicted probability ≥ 50%, we flag them at ≥ 30%. This significantly increases **Recall** (catching more actual defaults) at the cost of some **Precision** (more false alarms).
 
-**Impact:**
+**Impact (30-Seed Robustness Average comparison):**
 
-| Metric | Base XGBoost | Tuned XGBoost | Change |
-|--------|-------------|---------------|--------|
-| Recall (catching defaults) | ~0.08 | ~0.49 | ✅ +0.41 |
-| ROC-AUC | ~0.70 | ~0.70 | → same |
-| Accuracy | ~0.82 | ~0.72 | ↓ (expected) |
+| Metric | Base XGBoost | Tuned XGBoost (30% threshold) | Change |
+|--------|:---:|:---:|:---:|
+| **Recall (catching defaults)** | 8.02% ± 0.34% | 49.26% ± 0.48% | **✅ +41.24%** (catching 6x more defaults) |
+| **ROC-AUC (discrimination)** | 70.25% ± 0.23% | 70.09% ± 0.24% | **→ stable** (-0.16%) |
+| **Accuracy (overall correctness)** | 81.50% ± 0.08% | 72.19% ± 0.28% | **↓ -9.31%** (expected trade-off) |
 
 ---
 
