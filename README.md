@@ -267,9 +267,10 @@ Instead of flagging loans as "Bad" only when predicted probability ≥ 50%, we f
 
 | Metric | Base XGBoost | Tuned XGBoost (30% threshold) | Change |
 |--------|:---:|:---:|:---:|
-| **Recall (catching defaults)** | 8.02% ± 0.34% | 49.26% ± 0.48% | **✅ +41.24%** (catching 6x more defaults) |
-| **ROC-AUC (discrimination)** | 70.25% ± 0.23% | 70.09% ± 0.24% | **→ stable** (-0.16%) |
-| **Accuracy (overall correctness)** | 81.50% ± 0.08% | 72.19% ± 0.28% | **↓ -9.31%** (expected trade-off) |
+| **Recall (catching defaults)** | 8.02% ± 0.34% | **95.64% ± 0.24%** | **✅ +87.62%** (catching nearly ALL defaults) |
+| **Precision** | 48.02% ± 1.33% | 20.82% ± 0.05% | **↓ -27.2%** (more false alarms, expected trade-off) |
+| **ROC-AUC (discrimination)** | 70.25% ± 0.23% | 70.11% ± 0.25% | **→ stable** (-0.14%) |
+| **Accuracy (overall correctness)** | 81.50% ± 0.08% | **32.34% ± 0.26%** | **↓ -49.16%** (expected — model now flags most loans as risky) |
 
 ---
 
